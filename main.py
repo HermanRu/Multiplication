@@ -8,27 +8,53 @@ import pandas as pd
 
 def menu(user):
     print('='*35)
-    print('1 - User\n2 - Multiplication table scan\n3 - Mistakes and long answers')
-    print('4 - Statistics\n5 - Exit')
+    menu_options = {
+        1: 'Users',
+        2: 'Multiplication table scan',
+        3: 'Mistakes and long answers',
+        4: 'Statistics',
+        5: 'Exit'
+    }
+
+    def print_menu():
+        for key in menu_options.keys():
+            print(key, '--', menu_options[key])
+
+    def option1():
+        print('Not ready yet ;))')
+        menu(user)
+
+    def option2():
+        full_scan(user)
+
+    def option3():
+        repeat(user)
+
+    def option4():
+        print('Not yet ;))')
+        menu(user)
+
     while True:
+        print_menu()
+        option = ''
         try:
-            your_choice = int(input('Make your choice... '))
-            if your_choice == 1:
-                print('Not yet ;))')
-                menu(user)
-            elif your_choice == 2:
-                full_scan(user)
-            elif your_choice == 3:
-                repeat(user)
-            elif your_choice == 4:
-                print('Not yet ;))')
-                menu(user)
-            elif your_choice == 5:
-                sys.exit()
-            else:
-                print('Not correct input (1-5)')
+            option = int(input('Enter your choice: '))
         except ValueError:
-            print('Only numbers!!!')
+            print('Wrong input. Please enter a number ...')
+        # Check what choice was entered and act accordingly
+        if option == 1:
+            option1()
+        elif option == 2:
+            option2()
+        elif option == 3:
+            option3()
+        elif option == 4:
+            option4()
+        elif option == 5:
+            print('Thanks you, come back again!')
+            exit()
+        else:
+            print('Invalid option. Please enter a number between 1 and 5.')
 
 
 def full_scan(user):
