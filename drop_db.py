@@ -10,4 +10,5 @@ def drop_db(tbl_name):
 
 
 if __name__ == '__main__':
-    drop_db('multiplication')
+    # drop_db('multiplication')
+    drop_db('users')
