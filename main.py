@@ -13,14 +13,15 @@ def print_hi(name):
 
 
 def menu(user):
-    print('='*35)
+    print('=' * 35)
     menu_options = {
         1: 'Choose User',
         2: 'Crete New User',
         3: 'Scan Multiplication table',
         4: 'Mistakes and long answers',
-        5: 'Statistics for the last session',
-        6: 'Exit'
+        5: 'Statistics for your sessions',
+        6: 'Winners',
+        0: 'Exit'
     }
 
     for key in menu_options.keys():
@@ -36,7 +37,7 @@ def menu(user):
         if option == 1:
             # 1: 'Choose User'
             df_names = pd.read_sql_query(sql='SELECT user_id, name FROM users', con=con)
-            print('Choose your name:')
+            print('Choose your name or "0" to create new user:')
             print(tabulate(df_names, headers="keys", tablefmt='psql', showindex=False))
             try:
                 global user_id
@@ -67,16 +68,52 @@ def menu(user):
             repeat(user)
         elif option == 5:
             # 5: 'Statistics'
+            query = f"""
+            SELECT
+                session_id,
+                COUNT(result) - SUM(result) wrong_answers,
+                SUM(result) correct_answers,
+                ROUND(AVG(duration),1) avg_answer_time
+            FROM multiplication
+            WHERE user_id = {user}
+            GROUP BY session_id
+            """
+            print('This is your results')
+            print(tabulate(pd.read_sql_query(sql=query, con=con), headers="keys", tablefmt='psql', showindex=False))
+            # try/except block
+            session = int(input('Input the number of session to see more details and heatmap: '))
+
             last_session = cur.execute("""
                         SELECT max(session_id) max_session_id
                         FROM multiplication m 
                         WHERE user_id = (?)
                     """, [user]).fetchone()[0]
-            print_results(user,last_session)
+
+            print_results(user, session)
+            print_hi(user_name)
             menu(user)
 
         elif option == 6:
-            # 6: 'Exit'
+            query = """
+                    SELECT
+                        a.name Name,
+                        SUM(b.result) \"Solved examples\",
+                        COUNT(result) - SUM(result) \"Wrong answers\",
+                        SUM(result) \"Correct answers\",
+                        round(100.0*sum(result)/COUNT(result), 1) \"Success score\",
+                        ROUND(AVG(duration),1) \"Average answer time\"
+                    FROM 
+                        users a
+                        JOIN multiplication b on a.user_id = b.user_id
+                    GROUP BY a.name
+                    ORDER BY "Solved examples" DESC
+                    """
+            print(tabulate(pd.read_sql_query(sql=query, con=con), headers="keys", tablefmt='psql', showindex=False))
+            print_hi(user_name)
+            menu(user)
+
+        elif option == 0:
+            # 0: 'Exit'
             print('Thanks you, come back again!')
             exit()
         else:
@@ -175,7 +212,7 @@ def density_heatmap(query):
     fig1.write_image("duration_heatmap_tmp.png")
     fig2.write_image("result_heatmap_tmp.png")
 
-    os.startfile("duration_heatmap_tmp.png")
+    # os.startfile("duration_heatmap_tmp.png")
 
 
 def create_db():
@@ -218,9 +255,6 @@ def to_sql(us_id, ses_id, a, b, c, duration, result):
     con.commit()
 
 
-
-
-
 if __name__ == '__main__':
     con = sqlite3.connect('multi_db.db')
     cur = con.cursor()
@@ -228,6 +262,5 @@ if __name__ == '__main__':
     user_id = 0
     username = 'No Name'
     print_hi(username)
-    print('Put the cursor to console and press ENTER')
+    print('Put the cursor to console and choose user, press "1" ENTER')
     menu(user_id)
-
