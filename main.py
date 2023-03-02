@@ -33,7 +33,7 @@ def menu(user):
             option = int(input('Enter your choice: '))
         except ValueError:
             print('Wrong input. Please enter a number ...')
-        # Check what choice was entered and act accordingly
+        # Check what choice was entered
         if option == 1:
             # 1: 'Choose User'
             df_names = pd.read_sql_query(sql='SELECT user_id, name FROM users', con=con)
