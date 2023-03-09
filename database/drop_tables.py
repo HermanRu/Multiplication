@@ -1,8 +1,8 @@
 import sqlite3
 
 
-def drop_db(tbl_name):
-    con = sqlite3.connect('multi_db.db')
+def drop_table_db(tbl_name):
+    con = sqlite3.connect('database/multi_db.db')
     cur = con.cursor()
     cur.execute(f'DROP TABLE IF EXISTS {tbl_name}')
     con.commit()
@@ -11,4 +11,4 @@ def drop_db(tbl_name):
 
 if __name__ == '__main__':
     # drop_db('multiplication')
-    drop_db('users')
+    drop_table_db('users')

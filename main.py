@@ -4,15 +4,19 @@ import sqlite3
 import os
 
 import pandas as pd
-import plotly.express as px
 from tabulate import tabulate
 
+from database.sql_query import create_tables_db, load_to_sql, print_results
 
-def print_hi(name):
-    print(f'Hi, {name}')
+con = sqlite3.connect('database/multi_db.db')
+cur = con.cursor()
 
 
-def full_scan(u_id):
+def print_hi(user_name):
+    print(f'Hi, {user_name}')
+
+
+def full_scan(user_id):
     # make all examples
     all_examples = []
     for a in range(2, 10):
@@ -20,11 +24,11 @@ def full_scan(u_id):
             all_examples.append([a, b])
     examples = []
     [examples.append(x) for x in all_examples if x not in examples]
-    solve_examples(u_id, examples)
+    solve_examples(user_id, examples)
 
 
-def solve_examples(u_id, list_examples):
-    last_session = cur.execute(f'SELECT max(session_id) FROM multiplication WHERE user_id = {u_id}').fetchone()[0]
+def solve_examples(user_id, list_examples):
+    last_session = cur.execute(f'SELECT max(session_id) FROM multiplication WHERE user_id = {user_id}').fetchone()[0]
     if not isinstance(last_session, int):
         last_session = 0
     session_id = last_session + 1
@@ -45,14 +49,14 @@ def solve_examples(u_id, list_examples):
                 break
             except ValueError:
                 print("Not correct input")
-        to_sql(u_id, session_id, example[0], example[1], example[2], example[3], example[4])
+        load_to_sql(user_id, session_id, example[0], example[1], example[2], example[3], example[4])
     print("Well Done!!! :))")
-    print_results(u_id, session_id)
+    print_results(user_id, session_id)
 
 
-def repeat(u_id):
+def repeat(user_id):
     df = pd.read_sql_query(sql='SELECT * FROM multiplication', con=con)
-    df1 = df[df.user_id == u_id] \
+    df1 = df[df.user_id == user_id] \
         .groupby(["a", "b"], as_index=False) \
         .agg({'duration': 'mean', 'result': 'mean'}) \
         .sort_values(by='duration', ascending=False)
@@ -64,88 +68,11 @@ def repeat(u_id):
     for example in all_examples:
         print(f"{example[0]} * {example[1]} = {example[0] * example[1]}", end=" ")
         zzz = input("  ...remember and press ENTER  ")
-    solve_examples(u_id, all_examples)
+    solve_examples(user_id, all_examples)
 
 
-def print_results(u_id, session_id):
-    results = cur.execute('''
-                            SELECT 
-                              time(SUM(duration), 'unixepoch') spent_time,
-                              COUNT(result) - sum(result) errors,
-                              COUNT(result) total,
-                              round(100.0*sum(result)/COUNT(result), 1) success_score,
-                              round(SUM(duration)/COUNT(result),1) avg_time
-                            FROM multiplication m 
-                            WHERE user_id = (?) AND session_id = (?) 
-                          ''', [u_id, session_id]).fetchone()
-    print(f'Time in game {results[0]}')
-    print(f'Errors: {results[1]}/{results[2]}')
-    print(f'Success score: {results[3]}%')
-    print(f'Average Answer Time: {results[4]} sec')
-    density_heatmap(f'SELECT * FROM multiplication WHERE user_id = {u_id} AND session_id = {session_id}')
-
-
-def density_heatmap(sql_query):
-    df = pd.read_sql_query(sql=sql_query, con=con)
-
-    fig1 = px.density_heatmap(df, x='a', y='b', z="duration", histfunc="avg",
-                              nbinsx=9, nbinsy=9, text_auto='.1f', height=500, width=600)
-    fig2 = px.density_heatmap(df, x='a', y='b', z="result", histfunc="avg",
-                              nbinsx=9, nbinsy=9, text_auto='.1f', height=500, width=600)
-    fig1.update_xaxes(dtick=1)
-    fig1.update_yaxes(dtick=1)
-    fig2.update_xaxes(dtick=1)
-    fig2.update_yaxes(dtick=1)
-
-    fig1.write_image("duration_heatmap_tmp.png")
-    fig2.write_image("result_heatmap_tmp.png")
-
-    # os.startfile("duration_heatmap_tmp.png")
-
-
-def create_db():
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS multiplication (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id  INTEGER,
-            session_id INTEGER,
-            a  INTEGER,
-            b  INTEGER,
-            c  INTEGER,
-            duration  REAL,
-            result INTEGER,
-            FOREIGN KEY (user_id)  REFERENCES users (user_id)
-            );""")
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name  TEXT,
-            other TEXT);
-            """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id  INTEGER,
-    session_id INTEGER,
-    date TEXT,
-    session_duration REAL,
-    solved_examples INTEGER);
-    """)
-    con.commit()
-
-
-def to_sql(us_id, ses_id, a, b, c, duration, result):
-    cur.execute('INSERT INTO multiplication (user_id, session_id, a, b, c, duration, "result") VALUES (?,?,?,?,?,?,?)',
-                [us_id, ses_id, a, b, c, duration, result])
-    con.commit()
-
-
-if __name__ == '__main__':
-    con = sqlite3.connect('multi_db.db')
-    cur = con.cursor()
-    create_db()
+def menu():
+    create_tables_db()
     user_id = 0
     user_name = 'No_Name'
     print_hi(user_name)
@@ -260,3 +187,7 @@ if __name__ == '__main__':
             exit()
         else:
             print('Invalid option. Please enter a number between 1 and 6. or 0 to exit')
+
+
+if __name__ == '__main__':
+    menu()
