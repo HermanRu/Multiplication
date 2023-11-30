@@ -6,13 +6,14 @@ import os
 import pandas as pd
 from tabulate import tabulate
 
-from database.sql_query import create_tables_db, load_to_sql, print_results
+from database.sql_query import create_tables_db, load_to_sql, print_results, load_to_sessions
 
-con = sqlite3.connect('database/multi_db.db')
+con = sqlite3.connect('database/multi_db_2.db')
 cur = con.cursor()
 
 
 def print_hi(user_name):
+    print('=' * 35)
     print(f'Hi, {user_name}')
 
 
@@ -28,10 +29,16 @@ def full_scan(user_id):
 
 
 def solve_examples(user_id, list_examples):
-    last_session = cur.execute(f'SELECT max(session_id) FROM multiplication WHERE user_id = {user_id}').fetchone()[0]
+    last_session = cur.execute(f'SELECT max(session_id) FROM sessions').fetchone()[0]
+    last_user_session = cur.execute(f'SELECT max(session_user_id) FROM sessions WHERE user_id = {user_id}').fetchone()[0]
     if not isinstance(last_session, int):
         last_session = 0
+    if not isinstance(last_user_session, int):
+        last_user_session = 0
+    # print('last_session is .. ', last_session)
     session_id = last_session + 1
+    # print('last_user_session is .. ', last_user_session)
+    user_session_id = last_user_session + 1
     random.shuffle(list_examples)
     zzz = input('Ready to the test?? press ENTER ... ')
     n, n_all = 1, len(list_examples)
@@ -39,8 +46,8 @@ def solve_examples(user_id, list_examples):
         while True:
             try:
                 start_time = datetime.datetime.now()
-                example.append(int(input(f"{n} of {n_all}    {example[0]} * {example[1]} = ")))
-                example.append((datetime.datetime.now() - start_time).total_seconds())
+                example.append(int(input(f"{n} of {n_all}    {example[0]} * {example[1]} = ")))  # ex[0]=a,ex[1]=b,ex[3]=c
+                example.append(round((datetime.datetime.now() - start_time).total_seconds(), 2))  # ex[4] = duration
                 if example[0] * example[1] == example[2]:
                     example.append(1)
                 else:
@@ -49,18 +56,38 @@ def solve_examples(user_id, list_examples):
                 break
             except ValueError:
                 print("Not correct input")
-        load_to_sql(user_id, session_id, example[0], example[1], example[2], example[3], example[4])
+        load_to_sql(session_id, example[0], example[1], example[2], example[3], example[4])
+    totals = cur.execute('''
+                    SELECT 
+                      time(SUM(duration), 'unixepoch') spent_time,
+                      COUNT(result) total
+                    FROM multiplication m 
+                    WHERE session_id = (?) 
+                  ''', [session_id]).fetchone()
+    load_to_sessions(user_id, user_session_id, datetime.datetime.today().date(), totals[0], totals[1])
     print("Well Done!!! :))")
     print_results(user_id, session_id)
 
 
 def repeat(user_id):
-    df = pd.read_sql_query(sql='SELECT * FROM multiplication', con=con)
+    sql_q = """
+                SELECT
+                    a.session_id ,
+                    a.a ,
+                    a.b ,
+                    a.duration ,
+                    a."result" ,
+                    b.user_id
+                FROM multiplication a
+                LEFT JOIN sessions b
+                    ON a.session_id = b.session_id
+            """
+    df = pd.read_sql_query(sql=sql_q, con=con)
     df1 = df[df.user_id == user_id] \
         .groupby(["a", "b"], as_index=False) \
         .agg({'duration': 'mean', 'result': 'mean'}) \
         .sort_values(by='duration', ascending=False)
-    df1 = df1[(df1.duration >= df1.duration.quantile(q=0.75)) | (df1.result <= 0.75)]
+    df1 = df1[(df1.duration >= df1.duration.quantile(q=0.75)) | (df1.result <= 0.75)].head(36)
     a_list = df1.a.to_list()
     b_list = df1.b.to_list()
     all_examples = list(map(lambda a, b: [a, b], a_list, b_list))
@@ -139,14 +166,16 @@ def menu():
         elif option == 5:
             # 5: 'Statistics'
             query = f"""
-                SELECT
-                    session_id,
-                    COUNT(result) - SUM(result) wrong_answers,
-                    SUM(result) correct_answers,
+                SELECT 
+                    b.session_user_id  , 
+                    COUNT(a."result") - SUM(a."result") wrong_answers,
+                    SUM("result") correct_answers,
                     ROUND(AVG(duration),1) avg_answer_time
-                FROM multiplication
-                WHERE user_id = {user_id}
-                GROUP BY session_id
+                FROM multiplication a 
+                LEFT JOIN sessions b 
+                ON a.session_id = b.session_id 
+                WHERE b.user_id = {user_id}
+                GROUP BY b.session_id
                 """
             print('This is your results')
             print(tabulate(pd.read_sql_query(sql=query, con=con), headers="keys", tablefmt='psql', showindex=False))
@@ -167,14 +196,15 @@ def menu():
             query = """
                         SELECT
                             a.name Name,
-                            SUM(b.result) \"Solved examples\",
-                            COUNT(result) - SUM(result) \"Wrong answers\",
-                            SUM(result) \"Correct answers\",
-                            round(100.0*sum(result)/COUNT(result), 1) \"Success score\",
-                            ROUND(AVG(duration),1) \"Average answer time\"
+                            COUNT(c.result) "Solved examples",
+                            COUNT(c.result) - SUM(c.result) "Wrong answers",
+                            SUM(c.result) "Correct answers",
+                            round(100.0*sum(c.result)/COUNT(c.result), 1) "Success score",
+                            ROUND(AVG(c.duration),1) "Average answer time"
                         FROM 
                             users a
-                            JOIN multiplication b on a.user_id = b.user_id
+                            JOIN sessions b on a.user_id = b.user_id
+                            JOIN multiplication c on b.session_id = b.session_id
                         GROUP BY a.name
                         ORDER BY "Solved examples" DESC
                         """
